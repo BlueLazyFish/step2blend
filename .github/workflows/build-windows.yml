@@ -1,10 +1,15 @@
 # Build the Windows distributable for Step 2 Blend.
 #
 # Triggers:
-#   * push to main, when anything under step2glb/ or this workflow changes
-#   * push of a tag named v* (e.g. v7.2.0) — also attaches the zip to a
-#     GitHub Release if `softprops/action-gh-release` runs
+#   * every push to main
+#   * every push of a tag matching v* (e.g. v7.2.0) — also attaches the
+#     resulting zip to the matching GitHub Release
 #   * manual workflow_dispatch from the Actions tab
+#
+# We don't filter by `paths` because YAML disallows duplicate `push:`
+# keys, and tag pushes shouldn't be path-filtered. With vcpkg's binary
+# cache the no-op runs (e.g. addon-only commits) finish in a couple of
+# minutes anyway.
 #
 # Output: Step2Blend-vX.Y.Z-windows-x64.zip uploaded as a workflow
 # artifact (kept for 30 days). Tag pushes also attach to the matching
@@ -21,12 +26,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - "step2glb/**"
-      - ".github/workflows/build-windows.yml"
-  push:
-    tags:
-      - "v*"
+    tags: ["v*"]
 
 env:
   # Route vcpkg's binary cache through GitHub Actions' built-in cache.
