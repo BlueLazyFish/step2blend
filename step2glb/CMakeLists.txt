@@ -26,8 +26,15 @@ target_link_libraries(step2glb PRIVATE
     TKernel
 )
 
-# Embed an rpath so the binary can find the bundled OCCT dylibs at runtime
-# regardless of CWD. The bundle script overrides install_names.
-set_target_properties(step2glb PROPERTIES
-    BUILD_RPATH "${OpenCASCADE_LIBRARY_DIR}"
-)
+# macOS: embed an rpath so the binary finds OCCT dylibs at runtime no
+# matter the CWD. bundle_macos.sh later overrides the install_names so
+# the shipped copy looks at @executable_path/../lib instead.
+#
+# Windows: DLLs are resolved by being in the same directory as the EXE,
+# so no rpath equivalent is needed — bundle_windows.ps1 puts the OCCT
+# DLLs alongside step2glb.exe. Linux would use RUNPATH (not yet shipped).
+if(APPLE)
+    set_target_properties(step2glb PROPERTIES
+        BUILD_RPATH "${OpenCASCADE_LIBRARY_DIR}"
+    )
+endif()

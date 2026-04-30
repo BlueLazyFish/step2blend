@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Step 2 Blend",
     "author": "Louis Rist (mrrist.com)",
-    "version": (7, 1, 0),
+    "version": (7, 2, 0),
     "blender": (3, 0, 0),
     "location": "File › Import › STEP (.step, .stp)  •  View3D Sidebar › Step 2 Blend",
     "description": "Import STEP and STP files into Blender.",

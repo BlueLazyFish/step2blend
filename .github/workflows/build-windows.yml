@@ -1,0 +1,123 @@
+# Build the Windows distributable for Step 2 Blend.
+#
+# Triggers:
+#   * push to main, when anything under step2glb/ or this workflow changes
+#   * push of a tag named v* (e.g. v7.2.0) — also attaches the zip to a
+#     GitHub Release if `softprops/action-gh-release` runs
+#   * manual workflow_dispatch from the Actions tab
+#
+# Output: Step2Blend-vX.Y.Z-windows-x64.zip uploaded as a workflow
+# artifact (kept for 30 days). Tag pushes also attach to the matching
+# GitHub Release.
+#
+# First run is slow: vcpkg compiles OCCT from source (~45–60 min on a
+# Windows runner). Subsequent runs hit the GitHub Actions binary cache
+# and complete in ~5 min. The cache is keyed on vcpkg.json + the
+# baseline, so it stays valid until either of those changes.
+
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "step2glb/**"
+      - ".github/workflows/build-windows.yml"
+  push:
+    tags:
+      - "v*"
+
+env:
+  # Route vcpkg's binary cache through GitHub Actions' built-in cache.
+  # Without this, every CI run would recompile OCCT from scratch.
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── vcpkg setup ────────────────────────────────────────────────────────
+      # The runner image already ships vcpkg pre-installed at
+      # $env:VCPKG_INSTALLATION_ROOT — we just need the binary-cache plumbing.
+      - name: Export GitHub Actions cache vars for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      # ── Read version out of bl_info so we can name the zip ────────────────
+      - name: Extract addon version
+        id: version
+        shell: pwsh
+        run: |
+          $content = Get-Content step_importer/__init__.py -Raw
+          if ($content -match '"version":\s*\((\d+),\s*(\d+),\s*(\d+)') {
+            $v = "$($matches[1]).$($matches[2]).$($matches[3])"
+          } else {
+            $v = "dev"
+          }
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Building version $v"
+
+      # ── Configure + build via CMake (vcpkg toolchain handles OCCT) ────────
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          cmake -S step2glb -B build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      # ── Bundle DLLs alongside the EXE ─────────────────────────────────────
+      - name: Bundle DLLs
+        shell: pwsh
+        working-directory: step2glb
+        run: pwsh ./bundle_windows.ps1
+
+      # ── Sync into the addon's bin/ folder ─────────────────────────────────
+      - name: Sync bundle into step_importer/bin
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path step_importer/bin | Out-Null
+          Copy-Item -Force -Recurse step2glb/bundle/bin/* step_importer/bin/
+
+      # ── Build the release zip ─────────────────────────────────────────────
+      - name: Pack zip
+        shell: pwsh
+        run: |
+          $zip = "Step2Blend-v${{ steps.version.outputs.VERSION }}-windows-x64.zip"
+          if (Test-Path $zip) { Remove-Item $zip }
+          # Compress-Archive doesn't follow symlinks and treats `.git` etc as
+          # regular files, so we explicitly list what to include.
+          Compress-Archive `
+            -Path step_importer, LICENSE, LICENSES-third-party.txt `
+            -DestinationPath $zip
+          Write-Host "Created $zip"
+          Get-Item $zip | Format-List Name, Length
+
+      # ── Upload as a workflow artifact (always) ────────────────────────────
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Step2Blend-windows-x64-${{ steps.version.outputs.VERSION }}
+          path: Step2Blend-v*.zip
+          retention-days: 30
+
+      # ── Attach to GitHub Release (only on tag push) ───────────────────────
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Step2Blend-v*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

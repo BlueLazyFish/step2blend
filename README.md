@@ -30,13 +30,19 @@ step2blend/
 │   ├── step2glb.cpp        # ~400 lines: STEP read, tessellate with
 │   │                       # BRepMesh, analytic NURBS normals, GLB write.
 │   ├── CMakeLists.txt
-│   ├── bundle_macos.sh     # Resolves dylib deps, rewrites rpaths,
+│   ├── vcpkg.json          # Windows: declares opencascade dependency for vcpkg.
+│   ├── bundle_macos.sh     # macOS: gathers dylibs, rewrites rpaths,
 │   │                       # ad-hoc codesigns. Output → step2glb/bundle/
+│   ├── bundle_windows.ps1  # Windows: walks dumpbin /dependents and
+│   │                       # copies DLLs alongside the EXE. Output → same.
 │   ├── test.stp            # Generic test fixture
 │   └── test2.stp           # ditto, with 5 named colors
-└── scripts/
-    └── ship-mac.sh         # One-shot: cmake build → bundle → install
-                            # → zip. Run after any source edit.
+├── scripts/
+│   └── ship-mac.sh         # macOS one-shot: cmake build → bundle →
+│                           # install → zip. Run after any source edit.
+└── .github/workflows/
+    └── build-windows.yml   # CI: builds Step2Blend-vX.Y-windows-x64.zip
+                            # on every push to main + every v* tag.
 ```
 
 `step_importer/bin/` and `step_importer/lib/` are git-ignored — they get
@@ -75,9 +81,53 @@ in place (see *Windows port*, below), pushing the tag triggers a fresh
 
 ## Windows port
 
-Plan: GitHub Actions on `windows-latest`, OCCT installed via vcpkg, CMake
-build, PowerShell equivalent of `bundle_macos.sh` to gather DLLs. Workflow
-file lands in `.github/workflows/build-windows.yml` — not yet created.
+The Windows binary is built by GitHub Actions — no local Windows machine
+needed.
+
+Workflow: `.github/workflows/build-windows.yml`. Triggers on:
+* every push to `main` that touches `step2glb/`
+* every push of a tag matching `v*` (also attaches the zip to a Release)
+* manual run via the **Actions** tab → *Build Windows* → *Run workflow*
+
+The workflow uses vcpkg manifest mode (`step2glb/vcpkg.json`) to install
+OpenCASCADE, configures CMake against vcpkg's toolchain, builds
+`step2glb.exe` in Release mode, runs `bundle_windows.ps1` to collect
+the DLL closure, then packs `Step2Blend-vX.Y-windows-x64.zip` and
+uploads it as a workflow artifact.
+
+### First run is slow
+
+vcpkg compiles OCCT from source on the first invocation (≈45–60
+min). The job caches the resulting binaries via the GitHub Actions
+cache (`VCPKG_BINARY_SOURCES=x-gha,readwrite`), so subsequent runs
+finish in about 5 minutes. The cache invalidates only when
+`step2glb/vcpkg.json` changes.
+
+### Releasing a Windows build
+
+```bash
+git tag v7.2.0
+git push origin v7.2.0
+```
+
+The tag triggers the workflow. When it finishes, the zip appears both
+as a workflow artifact and attached to the GitHub Release named
+`v7.2.0`.
+
+### Building locally on Windows (optional, for debugging)
+
+If you do have a Windows machine and want to iterate locally, install
+Visual Studio 2022 Build Tools + vcpkg, then:
+
+```powershell
+cd step2glb
+vcpkg install --triplet x64-windows
+cmake -S . -B build `
+  -DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake `
+  -DVCPKG_TARGET_TRIPLET=x64-windows
+cmake --build build --config Release --parallel
+pwsh ./bundle_windows.ps1
+```
 
 ## Important conventions / past gotchas
 

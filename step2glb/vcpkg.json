@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+  "name": "step2glb",
+  "version-string": "7.2.0",
+  "description": "STEP/STP to GLB converter — back end for Step 2 Blend.",
+  "homepage": "https://www.mrrist.com",
+  "dependencies": [
+    "opencascade"
+  ]
+}
