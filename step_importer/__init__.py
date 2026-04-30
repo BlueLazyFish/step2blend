@@ -693,6 +693,19 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
         description="Put all imported bodies inside a new collection named after the file",
         default=True,
     )
+    center_on_origin: BoolProperty(
+        name="Center on Origin",
+        description=(
+            "Translate the import so its bounding-box centre sits at world "
+            "(0, 0, 0). Useful for CAD models exported far from origin"
+        ),
+        default=False,
+    )
+    auto_frame: BoolProperty(
+        name="Auto-frame in Viewport",
+        description="After importing, frame the model in the 3D viewport so it's centred and visible",
+        default=True,
+    )
 
     def draw(self, context):
         layout = self.layout
@@ -729,6 +742,8 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
         col.prop(self, "tidy_materials")
         col.prop(self, "smart_uv")
         col.prop(self, "create_collection")
+        col.prop(self, "center_on_origin")
+        col.prop(self, "auto_frame")
 
         # Material database dropdown — backed by the addon-preferences enum so
         # the choice persists across files and matches the sidebar panel.
@@ -1009,7 +1024,24 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
             for obj in mesh_objs:
                 _smart_uv_project(context, obj)
 
-        # Final selection: all imported meshes.
+        # Optional: centre the import on world origin. Computed from the
+        # union bounding box of every imported mesh in world space, then
+        # subtracted from each top-level (parentless) object's location so
+        # children inherit the translation cleanly.
+        if self.center_on_origin and mesh_objs:
+            import mathutils
+            coords = []
+            for o in mesh_objs:
+                for corner in o.bound_box:
+                    coords.append(o.matrix_world @ mathutils.Vector(corner))
+            if coords:
+                center = sum(coords, mathutils.Vector((0.0, 0.0, 0.0))) / len(coords)
+                for o in imported:
+                    if o.parent is None:
+                        o.location -= center
+
+        # Final selection: all imported meshes. Sets the active object too
+        # so the next viewport operation has a target.
         for o in context.selected_objects:
             o.select_set(False)
         for o in mesh_objs:
@@ -1017,11 +1049,37 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
         if mesh_objs:
             context.view_layer.objects.active = mesh_objs[0]
 
+        # Auto-frame: the user just hit Import — the very next thing they
+        # should see is their model, not the world origin. Walk every 3D
+        # viewport in the active screen and frame the selection in each.
+        if self.auto_frame and mesh_objs:
+            for area in context.window.screen.areas:
+                if area.type != "VIEW_3D":
+                    continue
+                for region in area.regions:
+                    if region.type == "WINDOW":
+                        try:
+                            with context.temp_override(area=area, region=region):
+                                bpy.ops.view3d.view_selected(use_all_regions=False)
+                        except Exception:
+                            pass
+                        break
+
+        # Summary toast — lands in Blender's Info panel and as a status-bar
+        # flash. Tells the buyer at a glance "yes, the work happened."
         elapsed = time.time() - self._t_start
+        n_parts = len(mesh_objs)
+        n_colors = len({m.name for o in mesh_objs for m in o.data.materials if m})
+        n_unique = len({o.data.name for o in mesh_objs if o.data})
         self.report(
             {"INFO"},
-            "Imported %d mesh(es) from '%s' in %.1fs."
-            % (len(mesh_objs), self._basename, elapsed),
+            "Step 2 Blend  •  %d part%s  •  %d colour%s  •  %d unique geometr%s  •  %.1fs"
+            % (
+                n_parts,  "s"   if n_parts  != 1 else "",
+                n_colors, "s"   if n_colors != 1 else "",
+                n_unique, "ies" if n_unique != 1 else "y",
+                elapsed,
+            ),
         )
         return {"FINISHED"}
 
