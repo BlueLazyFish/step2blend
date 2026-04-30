@@ -1,0 +1,50 @@
+Step 2 Blend bundles the following third-party components. Each retains
+its original licence; this file collects the required notices in one
+place. The proprietary licence covering Step 2 Blend itself appears in
+the separate LICENSE file.
+
+================================================================================
+Open CASCADE Technology (OCCT)
+================================================================================
+
+Step 2 Blend dynamically links to Open CASCADE Technology version 7.9.x.
+The OCCT runtime libraries are bundled inside the addon's lib/ folder
+(libTK*.dylib on macOS, TK*.dll on Windows) and loaded at runtime.
+
+Source:    https://dev.opencascade.org
+Licence:   GNU Lesser General Public License, version 2.1, with the
+           Open CASCADE additional exception (see below).
+
+The OCCT licence text:
+    https://dev.opencascade.org/sites/default/files/OCCT_LGPL_EXCEPTION_1.0.txt
+
+Per the LGPL, you have the right to relink Step 2 Blend against a
+different (compatible) build of OCCT. The bundled libraries can be
+replaced with substitutes you build yourself from OCCT source.
+
+The OCCT source is unmodified; no patches have been applied.
+
+================================================================================
+freetype, libpng, zlib
+================================================================================
+
+Pulled in transitively by OCCT. Each is permissively licensed (FreeType
+licence / libpng licence / zlib licence — all compatible with commercial
+redistribution). Source:
+    freetype:  https://freetype.org
+    libpng:    http://www.libpng.org
+    zlib:      https://zlib.net
+
+================================================================================
+Intel oneTBB
+================================================================================
+
+Pulled in transitively by OCCT. Apache License 2.0.
+Source: https://github.com/uxlfoundation/oneTBB
+
+================================================================================
+glTF 2.0 specification
+================================================================================
+
+The intermediate format produced by step2glb. Public specification:
+    https://github.com/KhronosGroup/glTF
