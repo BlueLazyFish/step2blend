@@ -91,8 +91,12 @@ jobs:
       - name: Sync bundle into step_importer/bin
         shell: pwsh
         run: |
+          # bundle_windows.ps1 ran from repo root, so its output is at
+          # ./bundle/bin/ (NOT step2glb/bundle/bin/). Mirror that into the
+          # addon's bin/ folder so the zip in the next step contains the
+          # EXE plus every OCCT DLL.
           New-Item -ItemType Directory -Force -Path step_importer/bin | Out-Null
-          Copy-Item -Force -Recurse step2glb/bundle/bin/* step_importer/bin/
+          Copy-Item -Force -Recurse bundle/bin/* step_importer/bin/
 
       # ── Build the release zip ─────────────────────────────────────────────
       - name: Pack zip
