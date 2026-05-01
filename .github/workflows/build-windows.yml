@@ -79,10 +79,13 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       # ── Bundle DLLs alongside the EXE ─────────────────────────────────────
+      # Run from repo root so the script's default `build/Release/step2glb.exe`
+      # and `build/vcpkg_installed/...` paths resolve correctly. The cmake
+      # configure step above used `-S step2glb -B build`, so both the EXE and
+      # the manifest-mode vcpkg install live under `build/` at the repo root.
       - name: Bundle DLLs
         shell: pwsh
-        working-directory: step2glb
-        run: pwsh ./bundle_windows.ps1
+        run: pwsh step2glb/bundle_windows.ps1
 
       # ── Sync into the addon's bin/ folder ─────────────────────────────────
       - name: Sync bundle into step_importer/bin

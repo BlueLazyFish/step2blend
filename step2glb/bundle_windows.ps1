@@ -21,6 +21,7 @@
 
 param(
     [string]$BinarySource = "build/Release/step2glb.exe",
+    [string]$BuildDir     = "build",
     [string]$OutDir       = "bundle",
     [string]$VcpkgBin     = $null
 )
@@ -28,15 +29,31 @@ param(
 $ErrorActionPreference = "Stop"
 
 # ── Resolve vcpkg's installed bin directory ──────────────────────────────────
+# Two modes possible:
+#   1. Manifest mode (our case): vcpkg.json in the repo, so CMake's
+#      vcpkg toolchain installs OCCT into <BuildDir>/vcpkg_installed/
+#      x64-windows/. Per-build, isolated, used by the CI workflow.
+#   2. Classic mode: a global `vcpkg install opencascade` populated
+#      $VCPKG_INSTALLATION_ROOT/installed/x64-windows/. Used when
+#      running the bundle script outside CI.
 if (-not $VcpkgBin) {
+    $candidates = @(
+        (Join-Path $BuildDir "vcpkg_installed\x64-windows\bin"),
+        (Join-Path $PWD     "build\vcpkg_installed\x64-windows\bin"),
+        (Join-Path (Split-Path -Parent $PWD) "build\vcpkg_installed\x64-windows\bin")
+    )
     if ($env:VCPKG_INSTALLATION_ROOT) {
-        $VcpkgBin = Join-Path $env:VCPKG_INSTALLATION_ROOT "installed\x64-windows\bin"
-    } else {
-        Write-Error "VCPKG_INSTALLATION_ROOT not set and -VcpkgBin not given. Cannot resolve DLLs."
+        $candidates += (Join-Path $env:VCPKG_INSTALLATION_ROOT "installed\x64-windows\bin")
+    }
+    foreach ($c in $candidates) {
+        if (Test-Path $c) {
+            $VcpkgBin = (Resolve-Path $c).Path
+            break
+        }
     }
 }
-if (-not (Test-Path $VcpkgBin)) {
-    Write-Error "vcpkg bin dir not found: $VcpkgBin"
+if (-not $VcpkgBin -or -not (Test-Path $VcpkgBin)) {
+    Write-Error ("vcpkg bin dir not found. Tried: " + ($candidates -join "; "))
 }
 
 # ── Reset output ─────────────────────────────────────────────────────────────
