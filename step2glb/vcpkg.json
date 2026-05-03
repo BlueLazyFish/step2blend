@@ -5,6 +5,9 @@
   "description": "STEP/STP to GLB converter — back end for Step 2 Blend.",
   "homepage": "https://www.mrrist.com",
   "dependencies": [
-    "opencascade"
+    {
+      "name": "opencascade",
+      "features": ["rapidjson"]
+    }
   ]
 }

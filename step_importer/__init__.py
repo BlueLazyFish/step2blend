@@ -526,11 +526,26 @@ def _stamp_import_metadata(objects, filepath, settings_dict):
         obj[_META_PART] = obj.name
 
 
+def _scene_objects(context=None):
+    """Iterate objects that are CURRENTLY linked into the active scene.
+
+    Crucial for the Re-import sidebar list: ``bpy.data.objects`` includes
+    orphan datablocks left behind after the user X-key-deletes an imported
+    object — the ``step_file`` custom prop survives until the next purge,
+    so a naive walk would still surface stale Re-import buttons that fail
+    when clicked. ``scene.objects`` only counts objects actually present
+    in the scene's collection hierarchy.
+    """
+    scene = (context or bpy.context).scene
+    return scene.objects
+
+
 def _find_step_files_in_scene():
     """Return [(filepath, mtime_recorded), ...] for every distinct STEP file
-    referenced by an object in the current Blend, sorted by basename."""
+    referenced by a scene-resident object, sorted by basename. Orphans in
+    bpy.data.objects are deliberately excluded — see _scene_objects."""
     files = {}
-    for obj in bpy.data.objects:
+    for obj in _scene_objects():
         f = obj.get(_META_FILE)
         if not f:
             continue
@@ -539,9 +554,9 @@ def _find_step_files_in_scene():
 
 
 def _objects_for_step_file(filepath):
-    """All objects whose step_file matches `filepath`."""
+    """All scene-resident objects whose step_file matches `filepath`."""
     abs_path = os.path.abspath(filepath)
-    return [o for o in bpy.data.objects if o.get(_META_FILE) == abs_path]
+    return [o for o in _scene_objects() if o.get(_META_FILE) == abs_path]
 
 
 def _strip_blender_suffix(name):
