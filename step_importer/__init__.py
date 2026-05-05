@@ -5,8 +5,8 @@ bl_info = {
     "blender": (3, 0, 0),
     "location": "File › Import › STEP (.step, .stp)  •  View3D Sidebar › Step 2 Blend",
     "description": "Import STEP and STP files into Blender.",
-    "doc_url":     "https://www.mrrist.com",
-    "tracker_url": "mailto:support@mrrist.com",
+    "doc_url":     "https://github.com/BlueLazyFish/step2blend",
+    "tracker_url": "https://github.com/BlueLazyFish/step2blend/issues",
     "support":     "COMMUNITY",
     "category":    "Import-Export",
 }
