@@ -93,4 +93,6 @@ zip -q -r "$ZIP_NAME" step_importer LICENSE LICENSES-third-party.txt \
 echo
 echo "── Done ──────────────────────────────────────────────────────────────"
 echo "Zip:   $REPO/$ZIP_NAME ($(du -h "$REPO/$ZIP_NAME" | cut -f1))"
-$INSTALL && echo "Installed: ~/Library/Application Support/Blender/${BLENDER_VERSION}/scripts/addons/step_importer"
+if $INSTALL; then
+    echo "Installed: ~/Library/Application Support/Blender/${BLENDER_VERSION}/scripts/addons/step_importer"
+fi
