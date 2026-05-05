@@ -5,7 +5,7 @@
 
 A Blender addon that imports STEP and STP CAD files using OpenCASCADE.
 
-Blender's built-in STEP importer is fine for casual use. Step 2 Blend is built for production CAD-to-Blender work: analytic NURBS normals, real materials, mesh-instance dedup for assemblies, and non-destructive re-import that lets you refresh a CAD model without losing materials, modifiers, or transforms.
+Blender doesn't ship with a STEP importer. Step 2 Blend brings production-quality CAD import to the platform: analytic NURBS normals, real materials, mesh-instance dedup for assemblies, and non-destructive re-import that lets you refresh a CAD model without losing materials, modifiers, or transforms.
 
 ## Install
 
@@ -71,6 +71,8 @@ step2blend/
 │   └── ship-mac.sh         # macOS one-shot: cmake build, bundle,
 │                           # install, zip.
 └── .github/workflows/
+    ├── build-mac.yml       # CI: builds Mac zip on every push to main
+    │                       # and every v* tag.
     └── build-windows.yml   # CI: builds Windows zip on every push to
                             # main and every v* tag.
 ```
