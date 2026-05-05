@@ -2,23 +2,69 @@
 
 A Blender addon that imports STEP and STP CAD files using OpenCASCADE.
 
-> Commercial product. Sold on Gumroad. Source kept in this private repo.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-## What it ships
+Blender's built-in STEP importer is fine for casual use; **Step 2 Blend** is
+built for production CAD-to-Blender work — analytic NURBS normals, real
+materials, mesh-instance dedup for assemblies, and non-destructive
+re-import that lets you refresh a CAD model without losing materials,
+modifiers, or transforms.
 
-For each supported platform, one zip the user installs through Blender's
-**Edit ▸ Preferences ▸ Add-ons ▸ Install** dialog:
+## Install
 
-```
-Step2Blend-vX.Y-mac-arm64.zip       # macOS (Apple Silicon)
-Step2Blend-vX.Y-windows-x64.zip     # Windows (x86_64)         [WIP]
-```
+1. Download the zip for your platform from the [latest release](
+   https://github.com/BlueLazyFish/step2blend/releases/latest):
+   * `Step2Blend-vX.Y.Z-mac-arm64.zip` — macOS (Apple Silicon)
+   * `Step2Blend-vX.Y.Z-windows-x64.zip` — Windows (x86_64)
+2. In Blender: **Edit ▸ Preferences ▸ Add-ons ▸ Install** ▸ pick the zip
+3. Tick the *Step 2 Blend* checkbox to enable it
+4. **File ▸ Import ▸ STEP (.step, .stp)**
 
-The zip contains the Blender addon (`step_importer/`) with the platform's
-compiled `step2glb` binary and its OCCT runtime libraries pre-bundled — the
-user never has to install OCCT themselves.
+The bundled OpenCASCADE 7.9 runtime ships inside the zip, so you don't
+need to install OCCT separately.
 
-## Repo layout
+### First-launch warnings
+
+Both zips are currently unsigned. On macOS the Gatekeeper may say
+"Apple cannot check it for malicious software" the first time the
+binary runs — right-click the addon zip and choose Open if needed.
+On Windows, SmartScreen may show "Microsoft Defender prevented an
+unrecognised app" — click *More info* ▸ *Run anyway*. Codesigning is on
+the roadmap.
+
+## Features
+
+- **Analytic NURBS normals** — curved surfaces shade smoothly even at
+  coarse triangle counts. No Weighted Normals modifier, no manual
+  smoothing groups.
+- **Friendly material naming** — STEP file colours import as `S2B Silver`,
+  `S2B Dark Blue`, etc., not `Material_3`. Curated colour table covers ~80
+  named tones; everything else falls back to clean hex.
+- **Per-project Material Database** — author your materials once, save
+  them to a `.blend`, and apply them automatically to every STEP import in
+  the project.
+- **Non-destructive re-import** — when CAD revisions land, one click
+  refreshes the geometry on existing objects while preserving your
+  materials, modifiers, animation, and parenting.
+- **Mesh-instance dedup** — assemblies with dozens of identical hardware
+  parts collapse to a single shared mesh datablock automatically.
+- **Assembly hierarchy preservation** — proper STEP assemblies preserve
+  their structure as parent-child relationships in the outliner.
+- **Auto-detect file units** — reads the unit declaration from the STEP
+  header. Override available for the rare mis-tagged file.
+- **Async import with status feedback** — Blender stays responsive while
+  the converter does its work. Status bar shows progress; Esc cancels.
+
+## Requirements
+
+- Blender 3.0 or later
+- macOS 12+ on Apple Silicon, **or** Windows 10/11 x86_64
+
+Linux isn't supported in the official builds yet — the CMake project
+should compile against a Homebrew-style Linux OCCT but you'd need to
+write your own bundle script. PRs welcome.
+
+## Repository layout
 
 ```
 step2blend/
@@ -30,94 +76,51 @@ step2blend/
 │   ├── step2glb.cpp        # ~400 lines: STEP read, tessellate with
 │   │                       # BRepMesh, analytic NURBS normals, GLB write.
 │   ├── CMakeLists.txt
-│   ├── vcpkg.json          # Windows: declares opencascade dependency for vcpkg.
+│   ├── vcpkg.json          # Windows: declares opencascade dependency.
 │   ├── bundle_macos.sh     # macOS: gathers dylibs, rewrites rpaths,
-│   │                       # ad-hoc codesigns. Output → step2glb/bundle/
+│   │                       # ad-hoc codesigns.
 │   ├── bundle_windows.ps1  # Windows: walks dumpbin /dependents and
-│   │                       # copies DLLs alongside the EXE. Output → same.
+│   │                       # copies DLLs alongside the EXE.
 │   ├── test.stp            # Generic test fixture
-│   └── test2.stp           # ditto, with 5 named colors
+│   └── test2.stp           # Five named colors
 ├── scripts/
 │   └── ship-mac.sh         # macOS one-shot: cmake build → bundle →
-│                           # install → zip. Run after any source edit.
+│                           # install → zip.
 └── .github/workflows/
-    └── build-windows.yml   # CI: builds Step2Blend-vX.Y-windows-x64.zip
-                            # on every push to main + every v* tag.
+    └── build-windows.yml   # CI: builds Windows zip on every push to
+                            # main + every v* tag.
 ```
 
 `step_importer/bin/` and `step_importer/lib/` are git-ignored — they get
 regenerated by `scripts/ship-mac.sh` for every build.
 
-## Development workflow (macOS)
+## Building from source
+
+### macOS
 
 Prereqs: Xcode CLT, CMake, OCCT 7.9.x via Homebrew.
 
 ```bash
 brew install cmake opencascade
-```
-
-After editing any C++ or Python source:
-
-```bash
+git clone https://github.com/BlueLazyFish/step2blend.git
+cd step2blend
 ./scripts/ship-mac.sh
 ```
 
-That single script does **everything** — rebuilds `step2glb`, runs the
-bundle script, copies bin+lib into `step_importer/`, syncs the addon into
-Blender's live addons folder, and refreshes the release zip at
-`Step2Blend-vX.Y-mac-arm64.zip` in the repo root.
+That single script rebuilds `step2glb`, runs the bundle script, copies
+bin+lib into `step_importer/`, and refreshes the release zip at the
+repo root. Pass `--install` to also drop the addon into your live
+Blender addons folder.
 
-To test in Blender after running the script:
-1. Restart Blender (or `Edit ▸ Preferences ▸ Add-ons ▸ Step 2 Blend ▸
-   disable + re-enable` if you only changed Python)
-2. `File ▸ Import ▸ STEP (.step, .stp)` — pick any file
-
-## Releasing
-
-Tag a version, bump `version` in `step_importer/__init__.py`'s `bl_info`,
-run `./scripts/ship-mac.sh`, upload the zip to Gumroad. Once Windows CI is
-in place (see *Windows port*, below), pushing the tag triggers a fresh
-`Step2Blend-vX.Y-windows-x64.zip` build automatically.
-
-## Windows port
+### Windows
 
 The Windows binary is built by GitHub Actions — no local Windows machine
-needed.
+required to ship a release. Tag a `v*` ref and the workflow at
+`.github/workflows/build-windows.yml` produces a release zip and attaches
+it to the matching GitHub Release.
 
-Workflow: `.github/workflows/build-windows.yml`. Triggers on:
-* every push to `main` that touches `step2glb/`
-* every push of a tag matching `v*` (also attaches the zip to a Release)
-* manual run via the **Actions** tab → *Build Windows* → *Run workflow*
-
-The workflow uses vcpkg manifest mode (`step2glb/vcpkg.json`) to install
-OpenCASCADE, configures CMake against vcpkg's toolchain, builds
-`step2glb.exe` in Release mode, runs `bundle_windows.ps1` to collect
-the DLL closure, then packs `Step2Blend-vX.Y-windows-x64.zip` and
-uploads it as a workflow artifact.
-
-### First run is slow
-
-vcpkg compiles OCCT from source on the first invocation (≈45–60
-min). The job caches the resulting binaries via the GitHub Actions
-cache (`VCPKG_BINARY_SOURCES=x-gha,readwrite`), so subsequent runs
-finish in about 5 minutes. The cache invalidates only when
-`step2glb/vcpkg.json` changes.
-
-### Releasing a Windows build
-
-```bash
-git tag v7.2.0
-git push origin v7.2.0
-```
-
-The tag triggers the workflow. When it finishes, the zip appears both
-as a workflow artifact and attached to the GitHub Release named
-`v7.2.0`.
-
-### Building locally on Windows (optional, for debugging)
-
-If you do have a Windows machine and want to iterate locally, install
-Visual Studio 2022 Build Tools + vcpkg, then:
+If you do want to iterate locally on Windows, install Visual Studio 2022
+Build Tools + vcpkg, then:
 
 ```powershell
 cd step2glb
@@ -129,30 +132,35 @@ cmake --build build --config Release --parallel
 pwsh ./bundle_windows.ps1
 ```
 
-## Important conventions / past gotchas
+The first CI Windows build takes ~45 min while vcpkg compiles OCCT from
+source. Subsequent builds hit the GitHub Actions cache and finish in
+~5 min.
+
+## Contributing
+
+Issues and pull requests welcome. Some conventions and past gotchas worth
+knowing if you're touching the C++ converter:
 
 - **Don't reverse normals manually** in `compute_analytic_normals()`.
   OCCT's `RWMesh_FaceIterator::NormalTransformed()` already calls
-  `aNorm.Reverse()` for `TopAbs_REVERSED` faces. Reversing here too gives
-  a double-flip and mirrored bodies render half-dark. Long-form comment
-  in the source explains.
-- **Build a fresh `outDoc` for monolithic compounds**, never mutate the
-  source `doc`. `XCAFDoc_ShapeTool::RemoveShape` is unreliable — the GLB
-  writer can still see "removed" labels.
+  `aNorm.Reverse()` for `TopAbs_REVERSED` faces. Reversing here too
+  produces a double-flip and mirrored bodies render half-dark.
+- **Build a fresh `outDoc` for monolithic compounds** — never mutate the
+  source XCAF doc. `XCAFDoc_ShapeTool::RemoveShape` is unreliable; the
+  GLB writer can still see "removed" labels.
 - **Copy length unit explicitly** to any new XCAF doc with
-  `XCAFDoc_DocumentTool::SetLengthUnit(outDoc, srcUnit)`. Forgetting this
-  lets the writer treat coords as metres → 1000× too-large imports.
-- **`cp` over launched Mac binaries silently fails.** Always `rm -rf` the
-  target before `cp` when refreshing `step_importer/bin/step2glb`.
-- **`_force_smooth_shading()`** in the addon must run after gltf import —
-  Blender flags ~3 % of polygons flat-shaded based on coincidental normal
-  alignment, which discards our analytic split normals.
+  `XCAFDoc_DocumentTool::SetLengthUnit(outDoc, srcUnit)`. Forgetting
+  this lets the writer treat coords as metres → 1000× too-large imports.
+- **`_force_smooth_shading()`** in the addon must run after the gltf
+  import — Blender flags ~3 % of polygons flat-shaded based on
+  coincidental normal alignment, which discards the analytic split
+  normals.
 
 ## License
 
-See `LICENSE` (commercial, all rights reserved) and
-`LICENSES-third-party.txt` (OCCT LGPL 2.1 acknowledgement).
+Step 2 Blend is licensed under the **GNU General Public License v3.0
+or later** (GPL-3.0-or-later). See `LICENSE` for the full text.
 
-## Contact
-
-Louis Rist — support@mrrist.com — https://www.mrrist.com
+Bundled third-party components (notably Open CASCADE Technology, which
+is LGPL-2.1) retain their original licences. See
+`LICENSES-third-party.txt` for the full attribution.
