@@ -21,6 +21,11 @@ on:
     branches: [main]
     tags: ["v*"]
 
+permissions:
+  # Required by softprops/action-gh-release on tag pushes — modern
+  # GITHUB_TOKEN defaults to contents:read, but Releases need write.
+  contents: write
+
 jobs:
   build:
     runs-on: macos-latest
