@@ -1,0 +1,54 @@
+# Build the macOS distributable for Step 2 Blend.
+#
+# Triggers:
+#   * every push to main
+#   * every push of a tag matching v* — also attaches the resulting zip
+#     to the matching GitHub Release
+#   * manual workflow_dispatch from the Actions tab
+#
+# Runs on the GitHub-hosted `macos-latest` image, which is Apple
+# Silicon. Output: Step2Blend-vX.Y.Z-mac-arm64.zip uploaded as a
+# workflow artifact, and attached to the matching v* release.
+#
+# Build time is ~5 minutes — Homebrew has prebuilt OCCT 7.9 binaries,
+# so we don't compile OCCT from source like the Windows side does.
+
+name: Build Mac
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies via Homebrew
+        # cmake is preinstalled on the runner image, but `brew install`
+        # is a no-op for it. Listing it explicitly keeps the dependency
+        # set self-documenting.
+        run: brew install cmake opencascade
+
+      - name: Build, bundle, pack via ship-mac.sh
+        run: bash ./scripts/ship-mac.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Step2Blend-mac-arm64
+          path: Step2Blend-v*.zip
+          retention-days: 30
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Step2Blend-v*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
