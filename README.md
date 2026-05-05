@@ -1,68 +1,52 @@
 # Step 2 Blend
 
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Blender](https://img.shields.io/badge/blender-3.0%2B-orange.svg)](https://www.blender.org/)
+
 A Blender addon that imports STEP and STP CAD files using OpenCASCADE.
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-
-Blender's built-in STEP importer is fine for casual use; **Step 2 Blend** is
-built for production CAD-to-Blender work — analytic NURBS normals, real
-materials, mesh-instance dedup for assemblies, and non-destructive
-re-import that lets you refresh a CAD model without losing materials,
-modifiers, or transforms.
+Blender's built-in STEP importer is fine for casual use. Step 2 Blend is built for production CAD-to-Blender work: analytic NURBS normals, real materials, mesh-instance dedup for assemblies, and non-destructive re-import that lets you refresh a CAD model without losing materials, modifiers, or transforms.
 
 ## Install
 
-1. Download the zip for your platform from the [latest release](
-   https://github.com/BlueLazyFish/step2blend/releases/latest):
-   * `Step2Blend-vX.Y.Z-mac-arm64.zip` — macOS (Apple Silicon)
-   * `Step2Blend-vX.Y.Z-windows-x64.zip` — Windows (x86_64)
-2. In Blender: **Edit ▸ Preferences ▸ Add-ons ▸ Install** ▸ pick the zip
-3. Tick the *Step 2 Blend* checkbox to enable it
-4. **File ▸ Import ▸ STEP (.step, .stp)**
+1. Download the zip for your platform from the [latest release](https://github.com/BlueLazyFish/step2blend/releases/latest):
+   * `Step2Blend-vX.Y.Z-mac-arm64.zip` for macOS (Apple Silicon)
+   * `Step2Blend-vX.Y.Z-windows-x64.zip` for Windows (x86_64)
+2. In Blender: **Edit > Preferences > Add-ons > Install**, then pick the zip.
+3. Tick the *Step 2 Blend* checkbox to enable it.
+4. Use **File > Import > STEP (.step, .stp)**.
 
-The bundled OpenCASCADE 7.9 runtime ships inside the zip, so you don't
-need to install OCCT separately.
+The bundled OpenCASCADE 7.9 runtime ships inside the zip, so you don't need to install OCCT separately.
 
 ### First-launch warnings
 
-Both zips are currently unsigned. On macOS the Gatekeeper may say
-"Apple cannot check it for malicious software" the first time the
-binary runs — right-click the addon zip and choose Open if needed.
-On Windows, SmartScreen may show "Microsoft Defender prevented an
-unrecognised app" — click *More info* ▸ *Run anyway*. Codesigning is on
-the roadmap.
-
-## Features
-
-- **Analytic NURBS normals** — curved surfaces shade smoothly even at
-  coarse triangle counts. No Weighted Normals modifier, no manual
-  smoothing groups.
-- **Friendly material naming** — STEP file colours import as `S2B Silver`,
-  `S2B Dark Blue`, etc., not `Material_3`. Curated colour table covers ~80
-  named tones; everything else falls back to clean hex.
-- **Per-project Material Database** — author your materials once, save
-  them to a `.blend`, and apply them automatically to every STEP import in
-  the project.
-- **Non-destructive re-import** — when CAD revisions land, one click
-  refreshes the geometry on existing objects while preserving your
-  materials, modifiers, animation, and parenting.
-- **Mesh-instance dedup** — assemblies with dozens of identical hardware
-  parts collapse to a single shared mesh datablock automatically.
-- **Assembly hierarchy preservation** — proper STEP assemblies preserve
-  their structure as parent-child relationships in the outliner.
-- **Auto-detect file units** — reads the unit declaration from the STEP
-  header. Override available for the rare mis-tagged file.
-- **Async import with status feedback** — Blender stays responsive while
-  the converter does its work. Status bar shows progress; Esc cancels.
+Both zips are currently unsigned. On macOS, Gatekeeper might say "Apple cannot check it for malicious software" the first time the binary runs. Right-click the addon zip and choose Open if needed. On Windows, SmartScreen might show "Microsoft Defender prevented an unrecognised app". Click *More info* then *Run anyway*. Codesigning is on the roadmap.
 
 ## Requirements
 
-- Blender 3.0 or later
-- macOS 12+ on Apple Silicon, **or** Windows 10/11 x86_64
+* Blender 3.0 or later
+* macOS 12+ on Apple Silicon, **or** Windows 10/11 x86_64
 
-Linux isn't supported in the official builds yet — the CMake project
-should compile against a Homebrew-style Linux OCCT but you'd need to
-write your own bundle script. PRs welcome.
+Linux isn't supported in the official builds yet. The CMake project should compile against a Homebrew-style Linux OCCT, but you'd need to write your own bundle script. PRs welcome.
+
+## Quick start
+
+1. Enable the addon in Preferences.
+2. **File > Import > STEP (.step, .stp)** and pick a CAD file.
+3. The status bar shows progress while the converter runs in the background. Esc cancels.
+4. When the import lands, materials carry friendly names like `S2B Silver` or `S2B Dark Blue`. Surfaces shade smoothly even at coarse triangle counts.
+5. When a CAD revision arrives, re-import the same file. The addon detects the existing objects and refreshes their geometry without touching your materials, modifiers, animation, or parenting.
+
+## Features
+
+* **Analytic NURBS normals.** Curved surfaces shade smoothly even at coarse triangle counts. No Weighted Normals modifier, no manual smoothing groups.
+* **Friendly material naming.** STEP file colours import as `S2B Silver`, `S2B Dark Blue`, etc., not `Material_3`. The curated colour table covers around 80 named tones; everything else falls back to clean hex.
+* **Per-project material database.** Author your materials once, save them to a `.blend`, and apply them automatically to every STEP import in the project.
+* **Non-destructive re-import.** When CAD revisions land, one click refreshes the geometry on existing objects while preserving your materials, modifiers, animation, and parenting.
+* **Mesh-instance dedup.** Assemblies with dozens of identical hardware parts collapse to a single shared mesh datablock automatically.
+* **Assembly hierarchy preservation.** Proper STEP assemblies preserve their structure as parent-child relationships in the outliner.
+* **Auto-detect file units.** Reads the unit declaration from the STEP header. There's an override for the rare mis-tagged file.
+* **Async import with status feedback.** Blender stays responsive while the converter does its work. Status bar shows progress, Esc cancels.
 
 ## Repository layout
 
@@ -72,7 +56,7 @@ step2blend/
 │   ├── __init__.py         # the user's addon zip.
 │   ├── material_db.py
 │   └── icons/S2B_Logo.png
-├── step2glb/               # The C++ converter. CMake + OCCT 7.9.x.
+├── step2glb/               # The C++ converter. CMake plus OCCT 7.9.x.
 │   ├── step2glb.cpp        # ~400 lines: STEP read, tessellate with
 │   │                       # BRepMesh, analytic NURBS normals, GLB write.
 │   ├── CMakeLists.txt
@@ -84,15 +68,14 @@ step2blend/
 │   ├── test.stp            # Generic test fixture
 │   └── test2.stp           # Five named colors
 ├── scripts/
-│   └── ship-mac.sh         # macOS one-shot: cmake build → bundle →
-│                           # install → zip.
+│   └── ship-mac.sh         # macOS one-shot: cmake build, bundle,
+│                           # install, zip.
 └── .github/workflows/
     └── build-windows.yml   # CI: builds Windows zip on every push to
-                            # main + every v* tag.
+                            # main and every v* tag.
 ```
 
-`step_importer/bin/` and `step_importer/lib/` are git-ignored — they get
-regenerated by `scripts/ship-mac.sh` for every build.
+`step_importer/bin/` and `step_importer/lib/` are git-ignored. They get regenerated by `scripts/ship-mac.sh` on every build.
 
 ## Building from source
 
@@ -107,20 +90,13 @@ cd step2blend
 ./scripts/ship-mac.sh
 ```
 
-That single script rebuilds `step2glb`, runs the bundle script, copies
-bin+lib into `step_importer/`, and refreshes the release zip at the
-repo root. Pass `--install` to also drop the addon into your live
-Blender addons folder.
+That single script rebuilds `step2glb`, runs the bundle script, copies bin and lib into `step_importer/`, and refreshes the release zip at the repo root. Pass `--install` to also drop the addon into your live Blender addons folder.
 
 ### Windows
 
-The Windows binary is built by GitHub Actions — no local Windows machine
-required to ship a release. Tag a `v*` ref and the workflow at
-`.github/workflows/build-windows.yml` produces a release zip and attaches
-it to the matching GitHub Release.
+The Windows binary is built by GitHub Actions, so no local Windows machine is required to ship a release. Tag a `v*` ref and the workflow at `.github/workflows/build-windows.yml` produces a release zip and attaches it to the matching GitHub Release.
 
-If you do want to iterate locally on Windows, install Visual Studio 2022
-Build Tools + vcpkg, then:
+If you want to iterate locally on Windows, install Visual Studio 2022 Build Tools and vcpkg, then:
 
 ```powershell
 cd step2glb
@@ -132,35 +108,31 @@ cmake --build build --config Release --parallel
 pwsh ./bundle_windows.ps1
 ```
 
-The first CI Windows build takes ~45 min while vcpkg compiles OCCT from
-source. Subsequent builds hit the GitHub Actions cache and finish in
-~5 min.
+The first CI Windows build takes around 45 minutes while vcpkg compiles OCCT from source. Subsequent builds hit the GitHub Actions cache and finish in around 5 minutes.
+
+## Roadmap
+
+* Codesigning for both platforms (clears the Gatekeeper / SmartScreen warning)
+* Linux build script + CI
+* Material database UI improvements
+
+If any of those land high on your list, open an [issue](https://github.com/BlueLazyFish/step2blend/issues).
 
 ## Contributing
 
-Issues and pull requests welcome. Some conventions and past gotchas worth
-knowing if you're touching the C++ converter:
+Issues and pull requests welcome. A few conventions and past gotchas worth knowing if you're touching the C++ converter:
 
-- **Don't reverse normals manually** in `compute_analytic_normals()`.
-  OCCT's `RWMesh_FaceIterator::NormalTransformed()` already calls
-  `aNorm.Reverse()` for `TopAbs_REVERSED` faces. Reversing here too
-  produces a double-flip and mirrored bodies render half-dark.
-- **Build a fresh `outDoc` for monolithic compounds** — never mutate the
-  source XCAF doc. `XCAFDoc_ShapeTool::RemoveShape` is unreliable; the
-  GLB writer can still see "removed" labels.
-- **Copy length unit explicitly** to any new XCAF doc with
-  `XCAFDoc_DocumentTool::SetLengthUnit(outDoc, srcUnit)`. Forgetting
-  this lets the writer treat coords as metres → 1000× too-large imports.
-- **`_force_smooth_shading()`** in the addon must run after the gltf
-  import — Blender flags ~3 % of polygons flat-shaded based on
-  coincidental normal alignment, which discards the analytic split
-  normals.
+* **Don't reverse normals manually** in `compute_analytic_normals()`. OCCT's `RWMesh_FaceIterator::NormalTransformed()` already calls `aNorm.Reverse()` for `TopAbs_REVERSED` faces. Reversing here too produces a double-flip and mirrored bodies render half-dark.
+* **Build a fresh `outDoc` for monolithic compounds.** Never mutate the source XCAF doc. `XCAFDoc_ShapeTool::RemoveShape` is unreliable; the GLB writer can still see "removed" labels.
+* **Copy length unit explicitly** to any new XCAF doc with `XCAFDoc_DocumentTool::SetLengthUnit(outDoc, srcUnit)`. Forgetting this lets the writer treat coords as metres, which produces 1000x too-large imports.
+* **`_force_smooth_shading()`** in the addon must run after the gltf import. Blender flags around 3% of polygons flat-shaded based on coincidental normal alignment, which discards the analytic split normals.
 
 ## License
 
-Step 2 Blend is licensed under the **GNU General Public License v3.0
-or later** (GPL-3.0-or-later). See `LICENSE` for the full text.
+Step 2 Blend is licensed under the **GNU General Public License v3.0 or later** (GPL-3.0-or-later). See `LICENSE` for the full text.
 
-Bundled third-party components (notably Open CASCADE Technology, which
-is LGPL-2.1) retain their original licences. See
-`LICENSES-third-party.txt` for the full attribution.
+Bundled third-party components (notably Open CASCADE Technology, which is LGPL-2.1) retain their original licences. See `LICENSES-third-party.txt` for the full attribution.
+
+---
+
+Built by Louis Rist. [www.mrrist.com](https://www.mrrist.com)
