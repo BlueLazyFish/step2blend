@@ -1393,14 +1393,6 @@ class VIEW3D_PT_s2b(bpy.types.Panel):
     bl_region_type = "UI"
     bl_category = "Step 2 Blend"
 
-    def draw_header(self, context):
-        # Place the S2B logo next to the panel title in the collapsed header
-        # bar. Falls back silently if the preview collection isn't loaded yet
-        # (rare — only happens during a botched register).
-        pcoll = _preview_collection()
-        if pcoll is not None and "s2b_logo" in pcoll:
-            self.layout.label(text="", icon_value=pcoll["s2b_logo"].icon_id)
-
     def draw(self, context):
         layout = self.layout
         prefs = context.preferences.addons[__name__].preferences
@@ -1444,48 +1436,6 @@ def _menu_func(self, context):
     self.layout.operator(IMPORT_OT_step.bl_idname, text="STEP (.step, .stp)")
 
 
-# ── Logo / preview collection ─────────────────────────────────────────────────
-#
-# Blender renders raw image files as icons through a "previews" collection.
-# We allocate one at register time, load the bundled S2B logo into it, and
-# expose its icon_id to the preferences panel via _preview_collection().
-# The collection is freed in unregister() to avoid leaking on addon reload.
-
-_PREVIEW_COLLECTION = None
-
-
-def _preview_collection():
-    return _PREVIEW_COLLECTION
-
-
-def _load_previews():
-    global _PREVIEW_COLLECTION
-    if _PREVIEW_COLLECTION is not None:
-        return
-    try:
-        import bpy.utils.previews as previews
-        pcoll = previews.new()
-        logo_path = os.path.join(_addon_dir(), "icons", "S2B_Logo.png")
-        if os.path.isfile(logo_path):
-            pcoll.load("s2b_logo", logo_path, "IMAGE")
-        _PREVIEW_COLLECTION = pcoll
-    except Exception as e:
-        print("[Step 2 Blend] Preview collection load failed: %s" % e)
-        _PREVIEW_COLLECTION = None
-
-
-def _unload_previews():
-    global _PREVIEW_COLLECTION
-    if _PREVIEW_COLLECTION is None:
-        return
-    try:
-        import bpy.utils.previews as previews
-        previews.remove(_PREVIEW_COLLECTION)
-    except Exception:
-        pass
-    _PREVIEW_COLLECTION = None
-
-
 _classes = (
     STEP_IMPORTER_Prefs,
     IMPORT_OT_step,
@@ -1495,7 +1445,6 @@ _classes = (
 
 
 def register():
-    _load_previews()
     for cls in _classes:
         bpy.utils.register_class(cls)
     bpy.types.TOPBAR_MT_file_import.append(_menu_func)
@@ -1507,7 +1456,6 @@ def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(_menu_func)
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
-    _unload_previews()
 
 
 if __name__ == "__main__":
