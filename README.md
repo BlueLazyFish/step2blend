@@ -5,7 +5,7 @@
 
 A Blender addon that imports STEP and STP CAD files using OpenCASCADE.
 
-Blender doesn't ship with a STEP importer. Step 2 Blend brings production-quality CAD import to the platform: analytic NURBS normals, real materials, mesh-instance dedup for assemblies, and non-destructive re-import that lets you refresh a CAD model without losing materials, modifiers, or transforms.
+Blender doesn't ship with a STEP importer. Step 2 Blend brings production-quality CAD import to the platform: analytic NURBS normals, real materials, and mesh-instance dedup for assemblies.
 
 ## Install
 
@@ -35,13 +35,11 @@ Linux isn't supported in the official builds yet. The CMake project should compi
 2. **File > Import > STEP (.step, .stp)** and pick a CAD file.
 3. The status bar shows progress while the converter runs in the background. Esc cancels.
 4. When the import lands, materials carry friendly names like `S2B Silver` or `S2B Dark Blue`. Surfaces shade smoothly even at coarse triangle counts.
-5. When a CAD revision arrives, re-import the same file. The addon detects the existing objects and refreshes their geometry without touching your materials, modifiers, animation, or parenting.
 
 ## Features
 
 * **Analytic NURBS normals.** Curved surfaces shade smoothly even at coarse triangle counts. No Weighted Normals modifier, no manual smoothing groups.
 * **Friendly material naming.** STEP file colours import as `S2B Silver`, `S2B Dark Blue`, etc., not `Material_3`. The curated colour table covers around 80 named tones; everything else falls back to clean hex.
-* **Non-destructive re-import.** When CAD revisions land, one click refreshes the geometry on existing objects while preserving your materials, modifiers, animation, and parenting.
 * **Mesh-instance dedup.** Assemblies with dozens of identical hardware parts collapse to a single shared mesh datablock automatically.
 * **Assembly hierarchy preservation.** Proper STEP assemblies preserve their structure as parent-child relationships in the outliner.
 * **Auto-detect file units.** Reads the unit declaration from the STEP header. There's an override for the rare mis-tagged file.
