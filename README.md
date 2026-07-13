@@ -41,7 +41,6 @@ Linux isn't supported in the official builds yet. The CMake project should compi
 
 * **Analytic NURBS normals.** Curved surfaces shade smoothly even at coarse triangle counts. No Weighted Normals modifier, no manual smoothing groups.
 * **Friendly material naming.** STEP file colours import as `S2B Silver`, `S2B Dark Blue`, etc., not `Material_3`. The curated colour table covers around 80 named tones; everything else falls back to clean hex.
-* **Per-project material database.** Author your materials once, save them to a `.blend`, and apply them automatically to every STEP import in the project.
 * **Non-destructive re-import.** When CAD revisions land, one click refreshes the geometry on existing objects while preserving your materials, modifiers, animation, and parenting.
 * **Mesh-instance dedup.** Assemblies with dozens of identical hardware parts collapse to a single shared mesh datablock automatically.
 * **Assembly hierarchy preservation.** Proper STEP assemblies preserve their structure as parent-child relationships in the outliner.
@@ -52,10 +51,8 @@ Linux isn't supported in the official builds yet. The CMake project should compi
 
 ```
 step2blend/
-├── step_importer/          # Blender addon (Python). Ships verbatim into
-│   ├── __init__.py         # the user's addon zip.
-│   ├── material_db.py
-│   └── icons/S2B_Logo.png
+├── step_importer/          # Blender addon (a single Python file). Ships
+│   └── __init__.py         # verbatim into the user's addon zip.
 ├── step2glb/               # The C++ converter. CMake plus OCCT 7.9.x.
 │   ├── step2glb.cpp        # ~400 lines: STEP read, tessellate with
 │   │                       # BRepMesh, analytic NURBS normals, GLB write.
@@ -116,7 +113,6 @@ The first CI Windows build takes around 45 minutes while vcpkg compiles OCCT fro
 
 * Codesigning for both platforms (clears the Gatekeeper / SmartScreen warning)
 * Linux build script + CI
-* Material database UI improvements
 
 If any of those land high on your list, open an [issue](https://github.com/BlueLazyFish/step2blend/issues).
 
