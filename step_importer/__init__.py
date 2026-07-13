@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Step 2 Blend",
     "author": "Louis Rist (mrrist.com)",
-    "version": (7, 2, 0),
+    "version": (7, 3, 0),
     "blender": (3, 0, 0),
     "location": "File › Import › STEP (.step, .stp)  •  View3D Sidebar › Step 2 Blend",
     "description": "Import STEP and STP files into Blender.",
@@ -23,8 +23,6 @@ import tempfile
 import subprocess
 from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty
 from bpy_extras.io_utils import ImportHelper
-
-from . import material_db
 
 
 # ── step2glb discovery ──────────────────────────────────────────────────────
@@ -102,38 +100,18 @@ _UNIT_SCALE = {
 
 # ── Quality presets ─────────────────────────────────────────────────────────
 #
-# Two modes are supported:
+# Chord deflection is absolute, in millimetres of model space — every face
+# hits the same physical chord tolerance, producing uniform-looking
+# triangles across an assembly regardless of face size. This is what most
+# CAD viewers use.
 #
-#   Absolute (default, Mayo / SimLab style)
-#     Chord deflection is in millimetres of model space. Every face hits the
-#     same physical chord tolerance, producing uniform-looking triangles
-#     across an assembly regardless of face size. This is what Mayo,
-#     SolidWorks, and most CAD viewers use.
-#
-#   Relative (legacy)
-#     Chord deflection is a fraction of each face's own bounding box.
-#     Adapts per-face but can produce visually inconsistent triangle sizes
-#     when face sizes vary widely. Kept for parity with v4.x.
-#
-# Quality slider (1–5) maps to (linear, angular_rad):
+# Quality slider (1–5) maps to (linear_mm, angular_rad):
 _ABS_QUALITY = {
     1: (4.0,   math.radians(35.0)),  # very coarse
     2: (2.0,   math.radians(28.0)),  # coarse
-    3: (1.0,   math.radians(20.0)),  # normal — Mayo "Precise" default
+    3: (1.0,   math.radians(20.0)),  # normal
     4: (0.5,   math.radians(15.0)),  # fine
     5: (0.25,  math.radians(10.0)),  # very fine
-}
-_REL_QUALITY = {
-    1: (0.01,    0.8),
-    2: (0.005,   0.6),
-    3: (0.0025,  0.5),
-    4: (0.0015,  0.4),
-    5: (0.001,   0.3),    # default — close to SimLab visual quality
-    6: (0.0007,  0.25),
-    7: (0.0005,  0.2),
-    8: (0.0003,  0.15),
-    9: (0.0002,  0.12),
-    10: (0.0001, 0.08),
 }
 
 
@@ -526,6 +504,20 @@ def _stamp_import_metadata(objects, filepath, settings_dict):
         obj[_META_PART] = obj.name
 
 
+_META_MATERIALS = "STEP_materials"  # JSON list of original slot names
+
+
+def _stamp_step_materials(obj):
+    """Record the object's current material slot names so Re-import can match
+    user-swapped materials back onto refreshed geometry by original name.
+    Kept as the legacy 'STEP_materials' key for compatibility with scenes
+    saved by earlier versions."""
+    if obj.type != "MESH" or obj.data is None:
+        return
+    names = [m.name if m else "" for m in obj.data.materials]
+    obj[_META_MATERIALS] = json.dumps(names)
+
+
 def _scene_objects(context=None):
     """Iterate objects that are CURRENTLY linked into the active scene.
 
@@ -603,22 +595,14 @@ class STEP_IMPORTER_Prefs(bpy.types.AddonPreferences):
         default="",
         subtype="FILE_PATH",
     )
-    # Persists the user's active material database (filename without .blend)
-    # across sessions and files. Used both by the import dialog and the panel.
-    active_matdb: EnumProperty(
-        name="Material Database",
-        description="Material database to auto-apply on STEP import",
-        items=material_db.database_enum_items,
-    )
-
     def draw(self, context):
         layout = self.layout
 
         # Blender's addon entry already renders the name, version,
         # description, maintainer, Website link, and Report-a-Bug link from
         # bl_info — the only thing left worth surfacing in this pane is the
-        # live runtime status (which binary is in use, where material DBs
-        # are stored). Anything else here would just be duplicate noise.
+        # live runtime status (which binary is in use). Anything else here
+        # would just be duplicate noise.
 
         # ── Engine status ────────────────────────────────────────────────
         engine = layout.box()
@@ -632,11 +616,6 @@ class STEP_IMPORTER_Prefs(bpy.types.AddonPreferences):
         else:
             engine.label(text="step2glb binary not found.", icon="ERROR")
         engine.prop(self, "step2glb_path")
-
-        # ── Material database ────────────────────────────────────────────
-        matdb = layout.box()
-        matdb.label(text="Material database", icon="MATERIAL")
-        matdb.label(text=material_db.matdb_dir(), icon="FILE_FOLDER")
 
 
 # ── Operator ─────────────────────────────────────────────────────────────────
@@ -659,42 +638,19 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
         items=_UNIT_ITEMS,
         default="AUTO",
     )
-    mesh_mode: EnumProperty(
-        name="Mesh Mode",
-        description=(
-            "Tessellation tolerance: absolute (chord in mm, uniform across "
-            "the assembly) or relative (chord as a fraction of each face)"
-        ),
-        items=(
-            ("ABS", "Absolute (mm)",
-             "Chord tolerance in millimetres. Triangles stay a uniform size "
-             "across the whole assembly (recommended for most CAD work)"),
-            ("REL", "Relative",
-             "Chord tolerance as a fraction of each face's bbox. Adapts per-"
-             "face but can produce visually inconsistent triangle sizes"),
-        ),
-        default="ABS",
-    )
     quality: IntProperty(
         name="Quality",
         description=(
-            "Absolute mode: 1 = very coarse (4 mm chord), 3 = balanced (1 mm), "
+            "1 = very coarse (4 mm chord), 3 = balanced (1 mm), "
             "5 = very fine (0.25 mm). Higher values produce more triangles."
         ),
         default=3, min=1, max=5, subtype="FACTOR",
     )
-    detail: IntProperty(
-        name="Mesh Detail",
-        description="Relative mode: 1 = coarse curves, 10 = very smooth. Flat faces stay flat (2 triangles)",
-        default=5, min=1, max=10, subtype="FACTOR",
-    )
     tidy_materials: BoolProperty(
         name="Tidy Materials",
         description=(
-            "Deduplicate identical Principled BSDF materials and rename "
-            "them based on base colour (e.g. 'STEP Dark Blue', 'STEP Red', "
-            "'STEP FF7E13'). Produces stable, human-readable keys for the "
-            "Material Database"
+            "Deduplicate identical materials and rename them based on base "
+            "colour (e.g. 'S2B Dark Blue', 'S2B Red', 'S2B FF7E13')"
         ),
         default=True,
     )
@@ -731,26 +687,17 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
         col.prop(self, "unit")
 
         layout.separator()
-        layout.prop(self, "mesh_mode")
-
         box = layout.box()
-        if self.mesh_mode == "ABS":
-            box.label(text="Quality (Absolute)")
-            row = box.row(align=True)
-            row.label(text="Coarse", icon="TRIA_LEFT")
-            row.prop(self, "quality", text="")
-            row.label(text="Fine", icon="TRIA_RIGHT")
-            chord_mm, ang_rad = _ABS_QUALITY[self.quality]
-            box.label(
-                text="chord %.2f mm  /  angle %d°" % (chord_mm, round(math.degrees(ang_rad))),
-                icon="INFO",
-            )
-        else:
-            box.label(text="Mesh Detail (Relative)")
-            row = box.row(align=True)
-            row.label(text="Low", icon="TRIA_LEFT")
-            row.prop(self, "detail", text="")
-            row.label(text="High", icon="TRIA_RIGHT")
+        box.label(text="Quality")
+        row = box.row(align=True)
+        row.label(text="Coarse", icon="TRIA_LEFT")
+        row.prop(self, "quality", text="")
+        row.label(text="Fine", icon="TRIA_RIGHT")
+        chord_mm, ang_rad = _ABS_QUALITY[self.quality]
+        box.label(
+            text="chord %.2f mm  /  angle %d°" % (chord_mm, round(math.degrees(ang_rad))),
+            icon="INFO",
+        )
 
         layout.separator()
         col = layout.column(heading="Options")
@@ -759,12 +706,6 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
         col.prop(self, "create_collection")
         col.prop(self, "center_on_origin")
         col.prop(self, "auto_frame")
-
-        # Material database dropdown — backed by the addon-preferences enum so
-        # the choice persists across files and matches the sidebar panel.
-        layout.separator()
-        prefs = context.preferences.addons[__name__].preferences
-        layout.prop(prefs, "active_matdb", text="Material DB")
 
     # Modal state — populated in execute(), consumed in modal()/_finish().
     _proc       = None
@@ -791,21 +732,12 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
         self._tempdir  = tempfile.mkdtemp(prefix="blender_step_")
         self._glb_path = os.path.join(self._tempdir, "out.glb")
 
-        if self.mesh_mode == "ABS":
-            linear_mm, angular_rad = _ABS_QUALITY[self.quality]
-            cmd = [
-                exe, self.filepath, self._glb_path,
-                "--linear", str(linear_mm),
-                "--angular", str(angular_rad),
-            ]
-        else:
-            linear_frac, angular_rad = _REL_QUALITY[self.detail]
-            cmd = [
-                exe, self.filepath, self._glb_path,
-                "--relative",
-                "--linear", str(linear_frac),
-                "--angular", str(angular_rad),
-            ]
+        linear_mm, angular_rad = _ABS_QUALITY[self.quality]
+        cmd = [
+            exe, self.filepath, self._glb_path,
+            "--linear", str(linear_mm),
+            "--angular", str(angular_rad),
+        ]
         print("[Step 2 Blend] Running: %s" % " ".join(cmd))
 
         # Start step2glb non-blocking and let a modal timer poll completion.
@@ -930,9 +862,6 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
             )
             return {"CANCELLED"}
 
-        # Re-fetch addon prefs (we no longer have the local from execute()).
-        prefs = context.preferences.addons[__name__].preferences
-
         # Snapshot existing top-level objects so we can isolate what gltf imports.
         before = set(o.name for o in bpy.data.objects)
 
@@ -969,10 +898,10 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
                 col_blender.objects.link(o)
 
         # Tidy materials BEFORE stamping STEP_materials so the recorded
-        # original-name keys are the friendly 'STEP <Name>' strings instead
+        # original-name keys are the friendly 'S2B <Name>' strings instead
         # of whatever raw names came out of the glTF importer (Material_3,
-        # etc). Database keys built against tidy names remain stable across
-        # imports of the same file.
+        # etc). Keys built against tidy names stay stable across re-imports
+        # of the same file.
         if self.tidy_materials:
             n_del, n_remap = _dedup_materials(mesh_objs)
             n_named = _rename_materials_friendly(mesh_objs)
@@ -1002,32 +931,17 @@ class IMPORT_OT_step(bpy.types.Operator, ImportHelper):
                 % (n_relinked, n_unique, n_meshes_removed)
             )
 
-        # Stamp original STEP material slot names on each imported mesh BEFORE
-        # DB application, so future re-applies always have a stable
-        # original-name reference even after slots get swapped.
+        # Stamp original STEP material slot names on each imported mesh so
+        # Re-import can match user-swapped materials back onto the refreshed
+        # geometry by their original names.
         for obj in mesh_objs:
-            material_db.stamp_step_materials(obj)
-
-        # If a material database is active, append its materials and swap any
-        # matching slots. Done before cleanup so the user sees their authored
-        # materials applied to the cleaned topology.
-        active_db = prefs.active_matdb
-        if active_db:
-            try:
-                mappings = material_db.ensure_database_loaded(active_db)
-                if mappings:
-                    n = material_db.apply_to_objects(mesh_objs, mappings)
-                    print("[Step 2 Blend] Material DB '%s' replaced %d slot(s)." % (active_db, n))
-            except Exception as e:
-                print("[Step 2 Blend] Material DB apply failed: %s" % e)
+            _stamp_step_materials(obj)
 
         # Stamp Re-import metadata on each imported mesh AND on the parent
         # collection (if any). Re-import then walks the scene looking for
         # objects with this metadata to swap their geometry.
         settings_for_reimport = {
-            "mesh_mode":       self.mesh_mode,
             "quality":         int(self.quality),
-            "detail":          int(self.detail),
             "unit":            self.unit,
             "tidy_materials":  bool(self.tidy_materials),
             "smart_uv":        bool(self.smart_uv),
@@ -1167,23 +1081,15 @@ class IMPORT_OT_step_reimport(bpy.types.Operator):
             self._settings = json.loads(old_objs[0].get(_META_SETTINGS, "{}"))
         except Exception:
             self._settings = {}
-        mesh_mode = self._settings.get("mesh_mode", "ABS")
-        quality   = int(self._settings.get("quality", 3))
-        detail    = int(self._settings.get("detail", 5))
+        quality = int(self._settings.get("quality", 3))
 
         # Build the cmd; run non-blocking via Popen.
         self._basename = os.path.basename(self.filepath)
         self._tempdir  = tempfile.mkdtemp(prefix="blender_step_reimp_")
         self._glb_path = os.path.join(self._tempdir, "out.glb")
-        if mesh_mode == "ABS":
-            linear, angular = _ABS_QUALITY[quality]
-            cmd = [exe, self.filepath, self._glb_path,
-                   "--linear", str(linear), "--angular", str(angular)]
-        else:
-            linear, angular = _REL_QUALITY[detail]
-            cmd = [exe, self.filepath, self._glb_path,
-                   "--relative",
-                   "--linear", str(linear), "--angular", str(angular)]
+        linear, angular = _ABS_QUALITY[quality]
+        cmd = [exe, self.filepath, self._glb_path,
+               "--linear", str(linear), "--angular", str(angular)]
         print("[Step 2 Blend] Re-import: %s" % " ".join(cmd))
         try:
             self._proc = subprocess.Popen(
@@ -1279,7 +1185,6 @@ class IMPORT_OT_step_reimport(bpy.types.Operator):
             self.report({"ERROR"}, "step2glb produced no output (exit %d)." % ret)
             return {"CANCELLED"}
 
-        prefs = context.preferences.addons[__name__].preferences
         old_objs = _objects_for_step_file(self.filepath)
         tidy_materials = bool(self._settings.get("tidy_materials", True))
 
@@ -1346,9 +1251,9 @@ class IMPORT_OT_step_reimport(bpy.types.Operator):
                 if replacement is not None and replacement is not slot:
                     old.data.materials[i] = replacement
 
-            # Re-stamp STEP_materials so future re-imports / DB applies use
-            # the freshly written slot names.
-            material_db.stamp_step_materials(old)
+            # Re-stamp STEP_materials so future re-imports use the freshly
+            # written slot names.
+            _stamp_step_materials(old)
 
             # Refresh the file mtime on this object.
             try:
@@ -1357,17 +1262,6 @@ class IMPORT_OT_step_reimport(bpy.types.Operator):
                 pass
 
             n_swapped += 1
-
-        # If a Material DB is active, re-apply it to the swapped objects so
-        # any newly added STEP colours pick up an authored material.
-        active_db = prefs.active_matdb
-        if active_db:
-            try:
-                mappings = material_db.ensure_database_loaded(active_db)
-                if mappings:
-                    material_db.apply_to_objects(old_objs, mappings)
-            except Exception as e:
-                print("[Step 2 Blend] Material DB apply failed on re-import: %s" % e)
 
         # Clean up the temporary new objects. Their mesh data is still
         # referenced by the swapped old objects, so it sticks around.
@@ -1448,11 +1342,9 @@ def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
     bpy.types.TOPBAR_MT_file_import.append(_menu_func)
-    material_db.register()
 
 
 def unregister():
-    material_db.unregister()
     bpy.types.TOPBAR_MT_file_import.remove(_menu_func)
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
